@@ -1,5 +1,16 @@
-import React, { createContext, useContext, useReducer, useCallback } from 'react';
-import { fetchPosts, createPost, updatePost, deletePost } from '../api/posts';
+import React, {
+  createContext,
+  useContext,
+  useReducer,
+  useCallback,
+} from "react";
+import {
+  fetchPosts,
+  fetchPostById,
+  createPost,
+  updatePost,
+  deletePost,
+} from "../api/posts";
 
 // Initial state
 const initialState = {
@@ -10,13 +21,13 @@ const initialState = {
 
 // Action types
 export const POST_ACTIONS = {
-  SET_LOADING: 'SET_LOADING',
-  SET_POSTS: 'SET_POSTS',
-  ADD_POST: 'ADD_POST',
-  UPDATE_POST: 'UPDATE_POST',
-  DELETE_POST: 'DELETE_POST',
-  SET_ERROR: 'SET_ERROR',
-  CLEAR_ERROR: 'CLEAR_ERROR',
+  SET_LOADING: "SET_LOADING",
+  SET_POSTS: "SET_POSTS",
+  ADD_POST: "ADD_POST",
+  UPDATE_POST: "UPDATE_POST",
+  DELETE_POST: "DELETE_POST",
+  SET_ERROR: "SET_ERROR",
+  CLEAR_ERROR: "CLEAR_ERROR",
 };
 
 // Reducer
@@ -24,35 +35,39 @@ const postReducer = (state, action) => {
   switch (action.type) {
     case POST_ACTIONS.SET_LOADING:
       return { ...state, loading: action.payload };
-    
+
     case POST_ACTIONS.SET_POSTS:
       return { ...state, posts: action.payload, loading: false, error: null };
-    
+
     case POST_ACTIONS.ADD_POST:
-      return { ...state, posts: [...state.posts, action.payload], loading: false };
-    
+      return {
+        ...state,
+        posts: [...state.posts, action.payload],
+        loading: false,
+      };
+
     case POST_ACTIONS.UPDATE_POST:
       return {
         ...state,
-        posts: state.posts.map(post =>
+        posts: state.posts.map((post) =>
           post.id === action.payload.id ? action.payload : post
         ),
         loading: false,
       };
-    
+
     case POST_ACTIONS.DELETE_POST:
       return {
         ...state,
-        posts: state.posts.filter(post => post.id !== action.payload),
+        posts: state.posts.filter((post) => post.id !== action.payload),
         loading: false,
       };
-    
+
     case POST_ACTIONS.SET_ERROR:
       return { ...state, error: action.payload, loading: false };
-    
+
     case POST_ACTIONS.CLEAR_ERROR:
       return { ...state, error: null };
-    
+
     default:
       return state;
   }
@@ -71,7 +86,9 @@ export const PostProvider = ({ children }) => {
       const posts = await fetchPosts();
       dispatch({ type: POST_ACTIONS.SET_POSTS, payload: posts });
     } catch (error) {
-      dispatch({ type: POST_ACTIONS.SET_ERROR, payload: error.message });
+      const message =
+        error instanceof Error ? error.message : "Erro ao carregar posts";
+      dispatch({ type: POST_ACTIONS.SET_ERROR, payload: message });
     }
   }, []);
 
@@ -82,7 +99,9 @@ export const PostProvider = ({ children }) => {
       dispatch({ type: POST_ACTIONS.ADD_POST, payload: newPost });
       return newPost;
     } catch (error) {
-      dispatch({ type: POST_ACTIONS.SET_ERROR, payload: error.message });
+      const message =
+        error instanceof Error ? error.message : "Erro ao criar post";
+      dispatch({ type: POST_ACTIONS.SET_ERROR, payload: message });
       throw error;
     }
   }, []);
@@ -94,7 +113,9 @@ export const PostProvider = ({ children }) => {
       dispatch({ type: POST_ACTIONS.UPDATE_POST, payload: updatedPost });
       return updatedPost;
     } catch (error) {
-      dispatch({ type: POST_ACTIONS.SET_ERROR, payload: error.message });
+      const message =
+        error instanceof Error ? error.message : "Erro ao atualizar post";
+      dispatch({ type: POST_ACTIONS.SET_ERROR, payload: message });
       throw error;
     }
   }, []);
@@ -105,7 +126,9 @@ export const PostProvider = ({ children }) => {
       await deletePost(id);
       dispatch({ type: POST_ACTIONS.DELETE_POST, payload: id });
     } catch (error) {
-      dispatch({ type: POST_ACTIONS.SET_ERROR, payload: error.message });
+      const message =
+        error instanceof Error ? error.message : "Erro ao deletar post";
+      dispatch({ type: POST_ACTIONS.SET_ERROR, payload: message });
       throw error;
     }
   }, []);
@@ -130,7 +153,7 @@ export const PostProvider = ({ children }) => {
 export const usePosts = () => {
   const context = useContext(PostContext);
   if (!context) {
-    throw new Error('usePosts must be used within a PostProvider');
+    throw new Error("usePosts must be used within a PostProvider");
   }
   return context;
 };

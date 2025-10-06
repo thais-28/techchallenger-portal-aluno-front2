@@ -1,122 +1,174 @@
-import { API_CONFIG, ERROR_MESSAGES } from '../constants';
+import { API_CONFIG, ERROR_MESSAGES } from "../constants";
 
-// Dados iniciais dos posts
-const INITIAL_POSTS = [
-    { 
-        id: 1, 
-        title: "Introdução ao React", 
-        author: "Prof. João Silva", 
-        description: "Conceitos fundamentais do React e componentização", 
-        content: "React é uma biblioteca JavaScript para construção de interfaces de usuário. Neste post, vamos explorar os conceitos fundamentais como componentes, props, state e o ciclo de vida dos componentes.",
-        createdAt: '2024-01-15T10:00:00.000Z',
-        updatedAt: '2024-01-15T10:00:00.000Z'
+const { BASE_URL } = API_CONFIG;
+
+// Utility function to handle API responses
+const handleApiResponse = async (response) => {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const message = errorData.message || `Erro HTTP: ${response.status}`;
+    throw new Error(message);
+  }
+  return response.json();
+};
+
+// Utility function to make API requests
+const apiRequest = async (endpoint, options = {}) => {
+  const url = `${BASE_URL}${endpoint}`;
+  const config = {
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
     },
-    { 
-        id: 2, 
-        title: "JavaScript ES6+", 
-        author: "Prof. Maria Santos", 
-        description: "Principais features do JavaScript moderno", 
-        content: "O JavaScript evoluiu muito nos últimos anos. Vamos abordar arrow functions, destructuring, template literals, promises, async/await e muito mais.",
-        createdAt: '2024-01-16T14:30:00.000Z',
-        updatedAt: '2024-01-16T14:30:00.000Z'
-    }
-];
+    ...options,
+  };
 
-const { STORAGE_KEYS, DELAY } = API_CONFIG;
+  try {
+    console.log(`Making API request to: ${url}`);
+    const response = await fetch(url, config);
+    console.log(`API response status: ${response.status}`);
+    return await handleApiResponse(response);
+  } catch (error) {
+    console.error(`API request failed for ${endpoint}:`, error);
 
-// Utility functions for localStorage operations
-const getStoredPosts = () => {
-    try {
-        const stored = localStorage.getItem(STORAGE_KEYS.POSTS);
-        if (stored) {
-            return JSON.parse(stored);
-        }
-        // Se não há dados armazenados, salva os dados iniciais
-        savePostsToStorage(INITIAL_POSTS);
-        return INITIAL_POSTS;
-    } catch (error) {
-        console.error('Error reading posts from localStorage:', error);
-        return INITIAL_POSTS;
+    if (error instanceof Error) {
+      // Verificar se é erro de conexão
+      if (error.name === "TypeError" && error.message.includes("fetch")) {
+        throw new Error(
+          "Erro de conexão com o servidor. Verifique se a API está rodando em localhost:3333"
+        );
+      }
+
+      // Verificar se é erro de rede
+      if (
+        error.message.includes("NetworkError") ||
+        error.message.includes("Failed to fetch")
+      ) {
+        throw new Error(
+          "Erro de rede. Verifique sua conexão e se a API está acessível."
+        );
+      }
     }
+
+    throw error;
+  }
 };
 
-const savePostsToStorage = (posts) => {
-    try {
-        localStorage.setItem(STORAGE_KEYS.POSTS, JSON.stringify(posts));
-    } catch (error) {
-        console.error('Error saving posts to localStorage:', error);
-        throw new Error('Erro ao salvar dados');
-    }
+// Transform API data to match frontend expectations
+const transformPostFromApi = (post) => {
+  return {
+    id: post._id || post.id,
+    title: post.title,
+    author: post.author,
+    description: post.content ? post.content.substring(0, 150) + "..." : "",
+    content: post.content,
+    subject: post.subject,
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+  };
 };
 
-// Simulate network delay
-const simulateDelay = (ms = DELAY) => new Promise(resolve => setTimeout(resolve, ms));
-
-export const fetchPosts = async () => {
-    await simulateDelay();
-    return getStoredPosts();
+// Transform frontend data to match API expectations
+const transformPostForApi = (post) => {
+  return {
+    title: post.title,
+    content: post.content,
+    author: post.author,
+    subject: post.subject || "Geral",
+  };
 };
 
-export const updatePost = async (id, updatedPost) => {
-    await simulateDelay();
-    
-    const posts = getStoredPosts();
-    const postId = parseInt(id);
-    const index = posts.findIndex(p => p.id === postId);
-    
-    if (index === -1) {
-        throw new Error(ERROR_MESSAGES.POST_NOT_FOUND);
+export const fetchPosts = async (page = 1, limit = 50) => {
+  try {
+    console.log(
+      `Fazendo requisição para: ${BASE_URL}/posts?page=${page}&limit=${limit}`
+    );
+    const data = await apiRequest(`/posts?page=${page}&limit=${limit}`);
+    console.log("Dados recebidos da API:", data);
+
+    // A API pode retornar um array diretamente ou { posts: [...] }
+    let posts = [];
+    if (Array.isArray(data)) {
+      posts = data;
+    } else if (data && data.posts && Array.isArray(data.posts)) {
+      posts = data.posts;
+    } else if (data && typeof data === "object") {
+      // Se recebemos um objeto mas não tem posts, pode ser uma resposta vazia válida
+      posts = [];
+    } else {
+      posts = [];
     }
-    
-    const updatedPostData = { 
-        ...posts[index], 
-        ...updatedPost, 
-        id: postId,
-        updatedAt: new Date().toISOString()
-    };
-    
-    posts[index] = updatedPostData;
-    savePostsToStorage(posts);
-    
-    return updatedPostData;
+
+    console.log(`Processando ${posts.length} posts`);
+    return posts.map(transformPostFromApi);
+  } catch (error) {
+    console.error("Erro ao buscar posts:", error);
+    const message =
+      error instanceof Error ? error.message : ERROR_MESSAGES.NETWORK_ERROR;
+    throw new Error(message);
+  }
+};
+
+export const fetchPostById = async (id) => {
+  try {
+    const post = await apiRequest(`/posts/${id}`);
+    return transformPostFromApi(post);
+  } catch (error) {
+    console.error("Erro ao buscar post:", error);
+    const message =
+      error instanceof Error ? error.message : ERROR_MESSAGES.POST_NOT_FOUND;
+    throw new Error(message);
+  }
 };
 
 export const createPost = async (newPost) => {
-    await simulateDelay();
-    
+  try {
     if (!newPost.title || !newPost.content || !newPost.author) {
-        throw new Error(ERROR_MESSAGES.REQUIRED_FIELDS);
+      throw new Error(ERROR_MESSAGES.REQUIRED_FIELDS);
     }
-    
-    const posts = getStoredPosts();
-    const newId = posts.length > 0 ? Math.max(...posts.map(p => p.id)) + 1 : 1;
-    
-    const post = { 
-        ...newPost, 
-        id: newId,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-    };
-    
-    posts.push(post);
-    savePostsToStorage(posts);
-    
-    return post;
+
+    const postData = transformPostForApi(newPost);
+    const createdPost = await apiRequest("/posts", {
+      method: "POST",
+      body: JSON.stringify(postData),
+    });
+
+    return transformPostFromApi(createdPost);
+  } catch (error) {
+    console.error("Erro ao criar post:", error);
+    const message =
+      error instanceof Error ? error.message : "Erro ao criar o post";
+    throw new Error(message);
+  }
+};
+
+export const updatePost = async (id, updatedPost) => {
+  try {
+    const postData = transformPostForApi(updatedPost);
+    const updated = await apiRequest(`/posts/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(postData),
+    });
+
+    return transformPostFromApi(updated);
+  } catch (error) {
+    console.error("Erro ao atualizar post:", error);
+    const message =
+      error instanceof Error ? error.message : "Erro ao atualizar o post";
+    throw new Error(message);
+  }
 };
 
 export const deletePost = async (id) => {
-    await simulateDelay();
-    
-    const posts = getStoredPosts();
-    const postId = parseInt(id);
-    const postExists = posts.some(p => p.id === postId);
-    
-    if (!postExists) {
-        throw new Error(ERROR_MESSAGES.POST_NOT_FOUND);
-    }
-    
-    const filteredPosts = posts.filter(p => p.id !== postId);
-    savePostsToStorage(filteredPosts);
-    
+  try {
+    await apiRequest(`/posts/${id}`, {
+      method: "DELETE",
+    });
     return true;
+  } catch (error) {
+    console.error("Erro ao deletar post:", error);
+    const message =
+      error instanceof Error ? error.message : "Erro ao deletar o post";
+    throw new Error(message);
+  }
 };
