@@ -9,6 +9,25 @@ const handleApiResponse = async (response) => {
     const message = errorData.message || `Erro HTTP: ${response.status}`;
     throw new Error(message);
   }
+
+  // Se status 204 (No Content) ou se não há conteúdo, retorna array vazio
+  if (
+    response.status === 204 ||
+    response.headers.get("content-length") === "0"
+  ) {
+    return [];
+  }
+
+  // Verifica se há conteúdo para fazer parse
+  const contentType = response.headers.get("content-type");
+  if (contentType && contentType.includes("application/json")) {
+    const text = await response.text();
+    if (!text || text.trim() === "") {
+      return [];
+    }
+    return JSON.parse(text);
+  }
+
   return response.json();
 };
 
@@ -86,16 +105,23 @@ export const fetchPosts = async (page = 1, limit = 50) => {
     const data = await apiRequest(`/posts?page=${page}&limit=${limit}`);
     console.log("Dados recebidos da API:", data);
 
-    // A API pode retornar um array diretamente ou { posts: [...] }
+    // A API pode retornar diferentes formatos
     let posts = [];
+
     if (Array.isArray(data)) {
+      // Resposta é um array direto
       posts = data;
     } else if (data && data.posts && Array.isArray(data.posts)) {
+      // Resposta é um objeto com propriedade posts
       posts = data.posts;
+    } else if (data === null || data === undefined || data === "") {
+      // Resposta vazia (204 No Content)
+      posts = [];
     } else if (data && typeof data === "object") {
-      // Se recebemos um objeto mas não tem posts, pode ser uma resposta vazia válida
+      // Objeto sem propriedade posts
       posts = [];
     } else {
+      // Qualquer outro caso
       posts = [];
     }
 
@@ -103,6 +129,18 @@ export const fetchPosts = async (page = 1, limit = 50) => {
     return posts.map(transformPostFromApi);
   } catch (error) {
     console.error("Erro ao buscar posts:", error);
+
+    // Se for erro de JSON vazio (status 204), retorna array vazio
+    if (
+      error instanceof SyntaxError &&
+      error.message.includes("Unexpected end of JSON input")
+    ) {
+      console.log(
+        "API retornou resposta vazia (sem posts), retornando array vazio"
+      );
+      return [];
+    }
+
     const message =
       error instanceof Error ? error.message : ERROR_MESSAGES.NETWORK_ERROR;
     throw new Error(message);

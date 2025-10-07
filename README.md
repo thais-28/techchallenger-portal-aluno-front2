@@ -1,4 +1,4 @@
-# 📚 Portal do Aluno - Tech Challenge Fase 2
+# 📚 Portal do Aluno - Tech Challenge Fase 3
 
 Aplicação web educacional desenvolvida em React para professores e professoras da rede pública, com o objetivo de facilitar a gestão e visualização de conteúdo educacional. Este frontend foi construído utilizando React, styled-components e integração com API REST, oferecendo uma interface moderna e responsiva.
 
@@ -360,6 +360,6 @@ Este projeto está licenciado sob a licença MIT.
 
 ---
 
-> "Desenvolvido como parte do Tech Challenge da Pós Tech FIAP + Alura – Fase 2"
+> "Desenvolvido como parte do Tech Challenge da Pós Tech FIAP + Alura – Fase 3"
 >
 > "Frontend React integrado com API REST para gestão de conteúdo educacional"
